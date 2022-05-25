@@ -1,0 +1,51 @@
+name: 'git clone win'
+description: 'git clone via ssh protocol in windows OS'
+inputs:
+  ssh-key:
+    description: 'Private ssh key which have access for repo'
+    required: true
+  depth:
+    description: 'git fetch --depth number'
+    required: false
+    default: 1
+
+outputs:
+  commit-sha:
+    description: "Random number"
+    value: ${{ steps.get-commit-sha.outputs.commit-sha }}
+runs:
+  using: "composite"
+  steps:
+    - run: |
+         Write-Output "$env:GITHUB_ACTION"
+         Write-Output "$env:GITHUB_ACTION_PATH"
+         Write-Output "Current user name: $env:UserName"
+         Write-Output "Current user home: $home"
+         Write-Output "RUNNER_TEMP: $env:RUNNER_TEMP"
+         Write-Output "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
+         Write-Output "GITHUB_REF: $env:GITHUB_REF"
+         Write-Output "GITHUB_SHA: $env:GITHUB_SHA"
+         Write-Output "GITHUB_REF_NAME: $env:GITHUB_REF_NAME"
+         "${{ inputs.ssh-key }}" | Out-File -encoding ASCII $env:RUNNER_TEMP/DEPLOY_SSH_PRIVATE_KEY
+         $acl = Get-Acl $env:RUNNER_TEMP/DEPLOY_SSH_PRIVATE_KEY
+         $acl.SetAccessRuleProtection($true,$false)
+         $AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($acl.owner,"FullControl","Allow")
+         $acl.SetAccessRule($AccessRule)
+         $acl | Set-Acl $env:RUNNER_TEMP/DEPLOY_SSH_PRIVATE_KEY
+         git.exe config --global --add safe.directory $env:GITHUB_WORKSPACE
+         git.exe init $env:GITHUB_WORKSPACE
+         cd $env:GITHUB_WORKSPACE
+         git.exe remote add origin git@github.com:$env:GITHUB_REPOSITORY.git
+         git.exe config --local gc.auto 0
+         git.exe config --local --name-only --get-regexp core\.sshCommand
+         git.exe config --local core.sshCommand 'C:\\Windows\\System32\\OpenSSH\\ssh.exe -i  \"$RUNNER_TEMP/DEPLOY_SSH_PRIVATE_KEY\"  -o StrictHostKeyChecking=no -o CheckHostIP=no'
+         git.exe -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=${{ inputs.depth }} origin $env:GITHUB_SHA
+         git.exe log -1 --format='%H'
+         git.exe clean -fdx
+         git.exe checkout --progress --force -B $env:GITHUB_REF_NAME fetch_head
+         git.exe log -1 --format='%H'
+      shell: powershell
+    - id: get-commit-sha
+      run: Write-Output "::set-output name=commit-sha::$env:GITHUB_SHA"
+      shell: powershell
+
