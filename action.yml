@@ -40,6 +40,12 @@ runs:
          git.exe config --local --name-only --get-regexp core\.sshCommand
          git.exe config --local core.sshCommand 'C:\\Windows\\System32\\OpenSSH\\ssh.exe -i  \"$RUNNER_TEMP/DEPLOY_SSH_PRIVATE_KEY\"  -o StrictHostKeyChecking=no -o CheckHostIP=no'
          git.exe -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=${{ inputs.depth }} origin $env:GITHUB_SHA
+         for ($t=0; $t -le 3; $t++ ){
+          if (!$?){
+             sleep 5;
+             git.exe -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=${{ inputs.depth }} origin $env:GITHUB_SHA
+            }
+         }
          git.exe log -1 --format='%H'
          git.exe clean -fdx
          git.exe checkout --progress --force -B $env:GITHUB_REF_NAME fetch_head
